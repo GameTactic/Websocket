@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  php:
+    build: ./etc/dev/php
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    ports:
+    - "1337:1337"
+    command: ['/app/bin/console', 'gos:websocket:server', '-vvvv', '-m']
+
+  redis:
+    image: redis:5-alpine
+    ports:
+      - "6379:6379"
