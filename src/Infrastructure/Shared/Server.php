@@ -24,6 +24,11 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class Server implements MessageComponentInterface
 {
+    private const LOG_INFO = 0x2;
+    private const LOG_WARN = 0x3;
+    private const LOG_ERROR = 0x4;
+    private const LOG_STRINGS = [self::LOG_INFO => 'INFO', self::LOG_WARN => 'WARNING', self::LOG_ERROR => 'ERROR'];
+
     private EventDispatcherInterface $dispatcher;
     private OutputInterface $output;
 
@@ -40,38 +45,48 @@ final class Server implements MessageComponentInterface
      */
     public function onOpen($conn)
     {
-        $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress.");
-        $this->dispatcher->dispatch(new WsOnOpen($conn));
+        $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress");
+        //$this->dispatcher->dispatch(new WsOnOpen($conn));
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @param $conn LocalConnectionInterface
      */
     public function onClose(ConnectionInterface $conn)
     {
-        return;
-        $this->dispatcher->dispatch(new WsOnClose());
+        $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress", );
+        //$this->dispatcher->dispatch(new WsOnClose());
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @param $conn LocalConnectionInterface
      */
     public function onError(ConnectionInterface $conn, \Exception $e)
     {
-        $this->dispatcher->dispatch(new WsOnError());
+        $msg = $e->getMessage();
+        $this->log("Error for client $conn->resourceId from $conn->remoteAddress with message of $msg", self::LOG_ERROR);
+        //$this->dispatcher->dispatch(new WsOnError());
     }
 
     /**
      * {@inheritdoc}
+     *
+     * @param $from LocalConnectionInterface
      */
     public function onMessage(ConnectionInterface $from, $msg)
     {
-        $this->dispatcher->dispatch(new WsOnMessage());
+        $this->log("Client $from->resourceId from >$from->remoteAddress sent a message of $msg", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
+        //$this->dispatcher->dispatch(new WsOnMessage());
     }
 
-    private function log(string $msg, $level = OutputInterface::VERBOSITY_NORMAL): void
+    private function log(string $msg, $type = self::LOG_INFO, $level = OutputInterface::VERBOSITY_NORMAL): void
     {
+        $type = self::LOG_STRINGS[$type];
         $date = (new \DateTimeImmutable())->format(DATE_ATOM);
-        $this->output->writeln("[$date] INFO: $msg", $level);
+        $this->output->writeln("[$date] $type: $msg", $level);
     }
 }
