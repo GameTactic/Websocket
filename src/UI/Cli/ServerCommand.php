@@ -13,7 +13,9 @@
 namespace App\UI\Cli;
 
 use App\Infrastructure\Shared\Server;
+use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
+use Ratchet\WebSocket\WsServer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -44,7 +46,7 @@ final class ServerCommand extends Command
         $port = $input->getArgument('port');
         $output->writeln(sprintf('Starting server on %s:%s', $host, $port), OutputInterface::VERBOSITY_VERBOSE);
 
-        $server = IoServer::factory(new Server($this->dispatcher, $output), $port, $host);
+        $server = IoServer::factory(new HttpServer(new WsServer(new Server($this->dispatcher, $output))), $port, $host);
         $server->run();
     }
 }

@@ -24,10 +24,16 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class Server implements MessageComponentInterface
 {
+    private const LOG_DEBUG = 0x1;
     private const LOG_INFO = 0x2;
     private const LOG_WARN = 0x3;
     private const LOG_ERROR = 0x4;
-    private const LOG_STRINGS = [self::LOG_INFO => 'INFO', self::LOG_WARN => 'WARNING', self::LOG_ERROR => 'ERROR'];
+    private const LOG_STRINGS = [
+        self::LOG_DEBUG => 'DEBUG',
+        self::LOG_INFO => 'INFO',
+        self::LOG_WARN => 'WARNING',
+        self::LOG_ERROR => 'ERROR'
+    ];
 
     private EventDispatcherInterface $dispatcher;
     private OutputInterface $output;
@@ -46,7 +52,8 @@ final class Server implements MessageComponentInterface
     public function onOpen($conn)
     {
         $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress");
-        //$this->dispatcher->dispatch(new WsOnOpen($conn));
+        $this->dispatcher->dispatch(new WsOnOpen($conn));
+        $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
     /**
@@ -57,7 +64,8 @@ final class Server implements MessageComponentInterface
     public function onClose(ConnectionInterface $conn)
     {
         $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress", );
-        //$this->dispatcher->dispatch(new WsOnClose());
+        $this->dispatcher->dispatch(new WsOnClose());
+        $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
     /**
@@ -69,7 +77,8 @@ final class Server implements MessageComponentInterface
     {
         $msg = $e->getMessage();
         $this->log("Error for client $conn->resourceId from $conn->remoteAddress with message of $msg", self::LOG_ERROR);
-        //$this->dispatcher->dispatch(new WsOnError());
+        $this->dispatcher->dispatch(new WsOnError());
+        $this->log("Error for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
     /**
@@ -79,14 +88,15 @@ final class Server implements MessageComponentInterface
      */
     public function onMessage(ConnectionInterface $from, $msg)
     {
-        $this->log("Client $from->resourceId from >$from->remoteAddress sent a message of $msg", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
-        //$this->dispatcher->dispatch(new WsOnMessage());
+        $this->log("Client $from->resourceId from $from->remoteAddress sent a message of $msg", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
+        $this->dispatcher->dispatch(new WsOnMessage());
+        $this->log("Client $from->resourceId message from $from->remoteAddress was handled", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
     }
 
     private function log(string $msg, $type = self::LOG_INFO, $level = OutputInterface::VERBOSITY_NORMAL): void
     {
         $type = self::LOG_STRINGS[$type];
         $date = (new \DateTimeImmutable())->format(DATE_ATOM);
-        $this->output->writeln("[$date] $type: $msg", $level);
+        $this->output->writeln("[$date] $type: $msg", $type === self::LOG_DEBUG ? OutputInterface::VERBOSITY_DEBUG : $level);
     }
 }
