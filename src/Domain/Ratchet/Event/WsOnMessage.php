@@ -10,6 +10,10 @@
  *
  */
 
-return [
-    Symfony\Bundle\FrameworkBundle\FrameworkBundle::class => ['all' => true],
-];
+namespace App\Domain\Ratchet\Event;
+
+use Symfony\Contracts\EventDispatcher\Event;
+
+final class WsOnMessage extends Event
+{
+}

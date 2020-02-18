@@ -10,6 +10,8 @@
  *
  */
 
-return [
-    Symfony\Bundle\FrameworkBundle\FrameworkBundle::class => ['all' => true],
-];
+namespace App\Domain\Ratchet;
+
+interface MessageComponentInterface extends \Ratchet\MessageComponentInterface
+{
+}
