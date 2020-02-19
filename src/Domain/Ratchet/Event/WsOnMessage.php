@@ -12,8 +12,18 @@
 
 namespace App\Domain\Ratchet\Event;
 
+use Ratchet\ConnectionInterface;
 use Symfony\Contracts\EventDispatcher\Event;
 
 final class WsOnMessage extends Event
 {
+    /** @var ConnectionInterface|\App\Domain\Ratchet\ConnectionInterface */
+    public ConnectionInterface $from;
+    public string $message;
+
+    public function __construct(ConnectionInterface $from, string $message)
+    {
+        $this->from = $from;
+        $this->message = $message;
+    }
 }

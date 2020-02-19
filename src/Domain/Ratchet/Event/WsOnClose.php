@@ -12,8 +12,16 @@
 
 namespace App\Domain\Ratchet\Event;
 
+use Ratchet\ConnectionInterface;
 use Symfony\Contracts\EventDispatcher\Event;
 
 final class WsOnClose extends Event
 {
+    /** @var ConnectionInterface|\App\Domain\Ratchet\ConnectionInterface */
+    public ConnectionInterface $connection;
+
+    public function __construct(ConnectionInterface $connection)
+    {
+        $this->connection = $connection;
+    }
 }

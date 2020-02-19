@@ -13,6 +13,7 @@
 namespace App\Infrastructure\Shared;
 
 use App\Domain\Ratchet\ConnectionInterface as LocalConnectionInterface;
+use App\Domain\Ratchet\Event\EventEnum;
 use App\Domain\Ratchet\Event\WsOnClose;
 use App\Domain\Ratchet\Event\WsOnError;
 use App\Domain\Ratchet\Event\WsOnMessage;
@@ -49,10 +50,10 @@ final class Server implements MessageComponentInterface
      *
      * @param $conn LocalConnectionInterface
      */
-    public function onOpen($conn)
+    public function onOpen(ConnectionInterface $conn)
     {
         $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress");
-        $this->dispatcher->dispatch(new WsOnOpen($conn));
+        $this->dispatcher->dispatch($this->wrapEvent(new WsOnOpen($conn)));
         $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
@@ -64,7 +65,7 @@ final class Server implements MessageComponentInterface
     public function onClose(ConnectionInterface $conn)
     {
         $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress", );
-        $this->dispatcher->dispatch(new WsOnClose());
+        $this->dispatcher->dispatch($this->wrapEvent(new WsOnClose($conn)));
         $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
@@ -77,7 +78,7 @@ final class Server implements MessageComponentInterface
     {
         $msg = $e->getMessage();
         $this->log("Error for client $conn->resourceId from $conn->remoteAddress with message of $msg", self::LOG_ERROR);
-        $this->dispatcher->dispatch(new WsOnError());
+        $this->dispatcher->dispatch($this->wrapEvent(new WsOnError($conn, $e)));
         $this->log("Error for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
@@ -89,8 +90,13 @@ final class Server implements MessageComponentInterface
     public function onMessage(ConnectionInterface $from, $msg)
     {
         $this->log("Client $from->resourceId from $from->remoteAddress sent a message of $msg", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
-        $this->dispatcher->dispatch(new WsOnMessage());
+        $this->dispatcher->dispatch($this->wrapEvent(new WsOnMessage($from, $msg)));
         $this->log("Client $from->resourceId message from $from->remoteAddress was handled", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
+    }
+
+    private function wrapEvent(object $event): EventEnum
+    {
+        return new EventEnum($event);
     }
 
     private function log(string $msg, $type = self::LOG_INFO, $level = OutputInterface::VERBOSITY_NORMAL): void

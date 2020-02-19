@@ -12,8 +12,18 @@
 
 namespace App\Domain\Ratchet\Event;
 
+use Ratchet\ConnectionInterface;
 use Symfony\Contracts\EventDispatcher\Event;
 
 final class WsOnError extends Event
 {
+    /** @var ConnectionInterface|\App\Domain\Ratchet\ConnectionInterface */
+    public ConnectionInterface $connection;
+    public \Exception $exception;
+
+    public function __construct(ConnectionInterface $connection, \Exception $exception)
+    {
+        $this->$connection = $connection;
+        $this->exception = $exception;
+    }
 }

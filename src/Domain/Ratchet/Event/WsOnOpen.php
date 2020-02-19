@@ -12,21 +12,16 @@
 
 namespace App\Domain\Ratchet\Event;
 
-use App\Domain\Ratchet\ConnectionInterface;
-use Ratchet\ConnectionInterface as VendorConnectionInterface;
+use Ratchet\ConnectionInterface;
 use Symfony\Contracts\EventDispatcher\Event;
 
 final class WsOnOpen extends Event
 {
-    public VendorConnectionInterface $conn;
+    /** @var ConnectionInterface|\App\Domain\Ratchet\ConnectionInterface */
+    public ConnectionInterface $connection;
 
-    /**
-     * WsOnOpen constructor.
-     *
-     * @param $conn ConnectionInterface|VendorConnectionInterface
-     */
-    public function __construct(VendorConnectionInterface $conn)
+    public function __construct(ConnectionInterface $connection)
     {
-        $this->conn = $conn;
+        $this->connection = $connection;
     }
 }
