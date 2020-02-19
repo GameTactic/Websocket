@@ -14,6 +14,12 @@ framework:
           messenger.bus.event:
             default_middleware: allow_no_handlers
 
+        serializer:
+            default_serializer: messenger.transport.symfony_serializer
+            symfony_serializer:
+                format: json
+                context: { }
+
         routing:
             # Route your messages to the transports
              'App\Application\Command\PublicCommand': public

@@ -7,11 +7,12 @@ services:
       - .:/app
     depends_on:
       - redis
+      - amqp
     ports:
     - "1337:1337"
-    command: ['/app/bin/console', 'gos:websocket:server', '-vvvv', '-m']
+    command: ['/app/bin/console', 'app:serve', '0.0.0.0', '1337', '-vvvv']
 
-  rmq:
+  amqp:
     image: rabbitmq:3-management
     environment:
       RABBITMQ_ERLANG_COOKIE: "SWQOKODSQALRPCLNMEQG"

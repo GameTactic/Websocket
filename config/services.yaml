@@ -11,10 +11,9 @@ services:
         autoconfigure: true
         public: false
         bind:
-            $elasticConfig: '%elastic%'
-            $queryBus: '@messenger.bus.query'
-            $commandBus: '@messenger.bus.command'
-            $eventBus: '@broadway.event_handling.event_bus'
+            #$queryBus: '@messenger.bus.query'
+            #$commandBus: '@messenger.bus.command'
+            $eventBus: '@messenger.bus.event'
 
     App\:
         resource: '../src/*'

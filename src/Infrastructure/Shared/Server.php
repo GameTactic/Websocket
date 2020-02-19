@@ -13,7 +13,6 @@
 namespace App\Infrastructure\Shared;
 
 use App\Domain\Ratchet\ConnectionInterface as LocalConnectionInterface;
-use App\Domain\Ratchet\Event\EventEnum;
 use App\Domain\Ratchet\Event\WsOnClose;
 use App\Domain\Ratchet\Event\WsOnError;
 use App\Domain\Ratchet\Event\WsOnMessage;
@@ -22,6 +21,8 @@ use App\Domain\Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Serializer\SerializerInterface;
 
 final class Server implements MessageComponentInterface
 {
@@ -30,19 +31,25 @@ final class Server implements MessageComponentInterface
     private const LOG_WARN = 0x3;
     private const LOG_ERROR = 0x4;
     private const LOG_STRINGS = [
-        self::LOG_DEBUG => 'DEBUG',
-        self::LOG_INFO  => 'INFO',
-        self::LOG_WARN  => 'WARNING',
-        self::LOG_ERROR => 'ERROR',
+        self::LOG_DEBUG => 'debug',
+        self::LOG_INFO  => 'info',
+        self::LOG_WARN  => 'warning',
+        self::LOG_ERROR => 'error',
     ];
 
     private EventDispatcherInterface $dispatcher;
     private OutputInterface $output;
+    private SerializerInterface $serializer;
 
-    public function __construct(EventDispatcherInterface $dispatcher, OutputInterface $output)
+    public function __construct(
+        EventDispatcherInterface $dispatcher,
+        OutputInterface $output,
+        SerializerInterface $serializer
+    )
     {
         $this->dispatcher = $dispatcher;
         $this->output = $output;
+        $this->serializer = $serializer;
     }
 
     /**
@@ -53,7 +60,7 @@ final class Server implements MessageComponentInterface
     public function onOpen(ConnectionInterface $conn)
     {
         $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress");
-        $this->dispatcher->dispatch($this->wrapEvent(new WsOnOpen($conn)));
+        $this->dispatcher->dispatch(new WsOnOpen($conn));
         $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
@@ -65,7 +72,7 @@ final class Server implements MessageComponentInterface
     public function onClose(ConnectionInterface $conn)
     {
         $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress", );
-        $this->dispatcher->dispatch($this->wrapEvent(new WsOnClose($conn)));
+        $this->dispatcher->dispatch(new WsOnClose($conn));
         $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
@@ -78,7 +85,7 @@ final class Server implements MessageComponentInterface
     {
         $msg = $e->getMessage();
         $this->log("Error for client $conn->resourceId from $conn->remoteAddress with message of $msg", self::LOG_ERROR);
-        $this->dispatcher->dispatch($this->wrapEvent(new WsOnError($conn, $e)));
+        //$this->dispatcher->dispatch(new WsOnError($conn, $e));
         $this->log("Error for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
     }
 
@@ -90,19 +97,20 @@ final class Server implements MessageComponentInterface
     public function onMessage(ConnectionInterface $from, $msg)
     {
         $this->log("Client $from->resourceId from $from->remoteAddress sent a message of $msg", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
-        $this->dispatcher->dispatch($this->wrapEvent(new WsOnMessage($from, $msg)));
-        $this->log("Client $from->resourceId message from $from->remoteAddress was handled", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
-    }
-
-    private function wrapEvent(object $event): EventEnum
-    {
-        return new EventEnum($event);
+        $this->dispatcher->dispatch(new WsOnMessage($from, $msg));
+        $this->log("Client $from->resourceId message from $from->remoteAddress was handled", self::LOG_DEBUG);
     }
 
     private function log(string $msg, $type = self::LOG_INFO, $level = OutputInterface::VERBOSITY_NORMAL): void
     {
         $type = self::LOG_STRINGS[$type];
         $date = (new \DateTimeImmutable())->format(DATE_ATOM);
-        $this->output->writeln("[$date] $type: $msg", self::LOG_DEBUG === $type ? OutputInterface::VERBOSITY_DEBUG : $level);
+        $this->output->writeln("$date [$type] $msg", self::LOG_DEBUG === $type ? OutputInterface::VERBOSITY_DEBUG : $level);
+    }
+
+    public function onConsume(\AMQPEnvelope $envelope, \AMQPQueue $queue): void
+    {
+        var_dump($envelope->getBody());
+        //var_dump($this->serializer->deserialize($envelope->getBody(), 'class', 'json'));
     }
 }

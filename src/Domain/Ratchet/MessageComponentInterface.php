@@ -14,4 +14,5 @@ namespace App\Domain\Ratchet;
 
 interface MessageComponentInterface extends \Ratchet\MessageComponentInterface
 {
+    public function onConsume(\AMQPEnvelope $envelope, \AMQPQueue $queue): void;
 }
