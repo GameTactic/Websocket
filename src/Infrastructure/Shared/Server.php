@@ -30,9 +30,9 @@ final class Server implements MessageComponentInterface
     private const LOG_ERROR = 0x4;
     private const LOG_STRINGS = [
         self::LOG_DEBUG => 'DEBUG',
-        self::LOG_INFO => 'INFO',
-        self::LOG_WARN => 'WARNING',
-        self::LOG_ERROR => 'ERROR'
+        self::LOG_INFO  => 'INFO',
+        self::LOG_WARN  => 'WARNING',
+        self::LOG_ERROR => 'ERROR',
     ];
 
     private EventDispatcherInterface $dispatcher;
@@ -97,6 +97,6 @@ final class Server implements MessageComponentInterface
     {
         $type = self::LOG_STRINGS[$type];
         $date = (new \DateTimeImmutable())->format(DATE_ATOM);
-        $this->output->writeln("[$date] $type: $msg", $type === self::LOG_DEBUG ? OutputInterface::VERBOSITY_DEBUG : $level);
+        $this->output->writeln("[$date] $type: $msg", self::LOG_DEBUG === $type ? OutputInterface::VERBOSITY_DEBUG : $level);
     }
 }
