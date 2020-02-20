@@ -14,7 +14,6 @@ namespace App\UI\Cli;
 
 use App\Infrastructure\Shared\AmqpAwareWsServer;
 use App\Infrastructure\Shared\Server;
-use Psr\Log\LoggerInterface;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
 use React\EventLoop\Factory as LoopFactory;

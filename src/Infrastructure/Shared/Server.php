@@ -18,16 +18,12 @@ use App\Domain\Ratchet\Event\WsOnMessage;
 use App\Domain\Ratchet\Event\WsOnOpen;
 use App\Domain\Ratchet\MessageComponentInterface;
 use App\Infrastructure\Shared\Stamps\MessageDeliveryTagStamp;
-use App\Infrastructure\Shared\Stamps\MessageQueueIdentifierStamp;
-use App\Infrastructure\Shared\Stamps\MessageRejectedStamp;
-use App\UI\Cli\ServerCommand;
 use Psr\Log\LoggerInterface;
 use Ratchet\ConnectionInterface;
-use Symfony\Component\Console\Logger\ConsoleLogger;
-use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\Exception\RejectRedeliveredMessageException;
@@ -59,8 +55,7 @@ final class Server implements MessageComponentInterface
         SerializerInterface $serializer,
         MessageBusInterface $eventBus,
         LoggerInterface $logger
-    )
-    {
+    ) {
         $this->dispatcher = $dispatcher;
         $this->log = $logger;
         $this->serializer = $serializer;
@@ -132,7 +127,7 @@ final class Server implements MessageComponentInterface
             $this->eventBus->dispatch($message->with(new ReceivedStamp('public'), new ConsumedByWorkerStamp()));
         } catch (\Throwable $e) {
             $rejectFirst = $e instanceof RejectRedeliveredMessageException;
-            if($rejectFirst) {
+            if ($rejectFirst) {
                 $queue->reject($envelope->getDeliveryTag());
             }
 
@@ -148,5 +143,8 @@ final class Server implements MessageComponentInterface
 
             return;
         }
+
+        $this->dispatcher->dispatch(new WorkerMessageHandledEvent($message, 'public'));
+        $queue->ack($message->last(MessageDeliveryTagStamp::class)->id);
     }
 }
