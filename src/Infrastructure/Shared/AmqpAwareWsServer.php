@@ -51,13 +51,12 @@ final class AmqpAwareWsServer extends WsServer
         AMQPQueue $queue,
         AMQPExchange $exchange,
         LoggerInterface $log
-    )
-    {
+    ) {
         $this->exchange = $exchange;
         $this->queue = $queue;
         $this->log = $log;
         $this->component = $component;
-        $this->nodeId = substr(md5(microtime(false)), 0,7);
+        $this->nodeId = substr(md5(microtime(false)), 0, 7);
         $this->log->info("New node $this->nodeId at your service!");
         $consumer = new Consumer($queue, $loop, 0.5, 10);
         $consumer->on('consume', [$this, 'onEnvelope']);
@@ -70,6 +69,7 @@ final class AmqpAwareWsServer extends WsServer
     {
         if (!$this->master && $this->masterUpdated > (time() - 10)) {
             $this->log->debug('No elections required');
+
             return;
         }
         $this->log->notice('Node is not master or slave. Starting elections');
@@ -105,8 +105,8 @@ final class AmqpAwareWsServer extends WsServer
             return;
         }
 
-        $this->electionRetry++;
-        $this->log->debug('Master did not response. Retry #' . $this->electionRetry);
+        ++$this->electionRetry;
+        $this->log->debug('Master did not response. Retry #'.$this->electionRetry);
         sleep(1);
         $this->queue->reject($envelope->getDeliveryTag(), AMQP_REQUEUE);
     }
@@ -145,8 +145,8 @@ final class AmqpAwareWsServer extends WsServer
             return;
         }
 
-        if ($data['to'] === 'all' && $data['from'] !== $this->nodeId) {
-            if ($data['type'] === self::QUORUM_VOTE_INIT) {
+        if ('all' === $data['to'] && $data['from'] !== $this->nodeId) {
+            if (self::QUORUM_VOTE_INIT === $data['type']) {
                 $this->log->notice('Received election voting initializer. Cleaning...');
                 $this->elections = true;
                 $this->master = false;
@@ -159,19 +159,19 @@ final class AmqpAwareWsServer extends WsServer
             return;
         }
 
-        if ($this->elections && $data['type'] === self::QUORUM_PING && $data['alias'] === 'master') {
+        if ($this->elections && self::QUORUM_PING === $data['type'] && 'master' === $data['alias']) {
             $this->iWantBeSlave($data, $envelope);
 
             return;
         }
 
-        if ($data['type'] === self::QUORUM_ANNOUNCE_SLAVE && $this->master) {
+        if (self::QUORUM_ANNOUNCE_SLAVE === $data['type'] && $this->master) {
             $this->log->info("New Slave $data[from] joined the cluster");
 
             return;
         }
 
-        if ($data['to'] === 'all' && $data['type'] === self::QUORUM_ANNOUNCE_MASTER) {
+        if ('all' === $data['to'] && self::QUORUM_ANNOUNCE_MASTER === $data['type']) {
             if ($data['payload'] === $this->nodeId) {
                 $this->log->info('I was elected as master of all nodes');
                 $this->master = true;
@@ -183,7 +183,7 @@ final class AmqpAwareWsServer extends WsServer
             return;
         }
 
-        if ($data['to'] === 'master' && $this->master && $data['from'] !== $this->nodeId && $data['type'] === self::QUORUM_PING) {
+        if ('master' === $data['to'] && $this->master && $data['from'] !== $this->nodeId && self::QUORUM_PING === $data['type']) {
             $this->log->debug("Got ping from $data[from]");
             $this->publish($data['from']);
 
@@ -191,20 +191,20 @@ final class AmqpAwareWsServer extends WsServer
         }
 
         if ($data['to'] === $this->nodeId) {
-            if ($data['type'] === self::QUORUM_VOTE) {
+            if (self::QUORUM_VOTE === $data['type']) {
                 $this->registerVote($data, $envelope);
 
                 return;
             }
 
-            if ($data['type'] === self::QUORUM_PING && $data['alias'] === 'master') {
+            if (self::QUORUM_PING === $data['type'] && 'master' === $data['alias']) {
                 $this->iWantBeSlave($data, $envelope);
 
                 return;
             }
         }
 
-        if ($data['from'] === $this->nodeId && $data['type'] === self::QUORUM_PING && $this->elections) {
+        if ($data['from'] === $this->nodeId && self::QUORUM_PING === $data['type'] && $this->elections) {
             // When trying to find master, but it was redirected here...
             $this->resolveMaster($data, $envelope);
 
@@ -229,8 +229,8 @@ final class AmqpAwareWsServer extends WsServer
 
     public function onEnvelope(AMQPEnvelope $envelope, AMQPQueue $queue): void
     {
-        if (!(substr($envelope->getBody(), 0, 7) === 'Quorum:')) {
-            call_user_func([$this->component, 'onConsume'], $envelope, $queue);
+        if (!('Quorum:' === substr($envelope->getBody(), 0, 7))) {
+            \call_user_func([$this->component, 'onConsume'], $envelope, $queue);
 
             return;
         }
@@ -239,16 +239,16 @@ final class AmqpAwareWsServer extends WsServer
 
     private function publish(string $to, int $type = self::QUORUM_PING, ?string $payload = null): void
     {
-        /** @noinspection PhpUnhandledExceptionInspection */
-        $this->exchange->publish('Quorum:' . json_encode(
-                [
-                    'flood' => crc32(microtime()),
-                    'from' => $this->nodeId,
-                    'alias' => $this->master ? 'master' : 'slave',
-                    'to' => $to,
-                    'type' => $type,
+        // @noinspection PhpUnhandledExceptionInspection
+        $this->exchange->publish('Quorum:'.json_encode(
+            [
+                    'flood'   => crc32(microtime()),
+                    'from'    => $this->nodeId,
+                    'alias'   => $this->master ? 'master' : 'slave',
+                    'to'      => $to,
+                    'type'    => $type,
                     'payload' => $payload,
                 ]
-            ), 'messages');
+        ), 'messages');
     }
 }

@@ -136,7 +136,7 @@ final class Server implements MessageComponentInterface
         $this->dispatcher->dispatch(new WorkerMessageHandledEvent($message, 'public'));
         // We are trusting TTL and RabbitMQ to deliver twice.
         // This is just example, how to ack the message.
-         $queue->ack($message->last(MessageDeliveryTagStamp::class)->id);
-         //$queue->reject($message->last(MessageDeliveryTagStamp::class)->id, AMQP_REQUEUE);
+        $queue->ack($message->last(MessageDeliveryTagStamp::class)->id);
+        //$queue->reject($message->last(MessageDeliveryTagStamp::class)->id, AMQP_REQUEUE);
     }
 }
