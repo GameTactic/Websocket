@@ -14,15 +14,27 @@ namespace App\Infrastructure\Shared;
 
 use App\Domain\Ratchet\ConnectionInterface as LocalConnectionInterface;
 use App\Domain\Ratchet\Event\WsOnClose;
-use App\Domain\Ratchet\Event\WsOnError;
 use App\Domain\Ratchet\Event\WsOnMessage;
 use App\Domain\Ratchet\Event\WsOnOpen;
 use App\Domain\Ratchet\MessageComponentInterface;
+use App\Infrastructure\Shared\Stamps\MessageDeliveryTagStamp;
+use App\Infrastructure\Shared\Stamps\MessageQueueIdentifierStamp;
+use App\Infrastructure\Shared\Stamps\MessageRejectedStamp;
+use App\UI\Cli\ServerCommand;
+use Psr\Log\LoggerInterface;
 use Ratchet\ConnectionInterface;
+use Symfony\Component\Console\Logger\ConsoleLogger;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Serializer\SerializerInterface;
+use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Component\Messenger\Exception\RejectRedeliveredMessageException;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ConsumedByWorkerStamp;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 final class Server implements MessageComponentInterface
 {
@@ -38,18 +50,21 @@ final class Server implements MessageComponentInterface
     ];
 
     private EventDispatcherInterface $dispatcher;
-    private OutputInterface $output;
+    private LoggerInterface $log;
     private SerializerInterface $serializer;
+    private MessageBusInterface $eventBus;
 
     public function __construct(
         EventDispatcherInterface $dispatcher,
-        OutputInterface $output,
-        SerializerInterface $serializer
+        SerializerInterface $serializer,
+        MessageBusInterface $eventBus,
+        LoggerInterface $logger
     )
     {
         $this->dispatcher = $dispatcher;
-        $this->output = $output;
+        $this->log = $logger;
         $this->serializer = $serializer;
+        $this->eventBus = $eventBus;
     }
 
     /**
@@ -59,9 +74,9 @@ final class Server implements MessageComponentInterface
      */
     public function onOpen(ConnectionInterface $conn)
     {
-        $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress");
+        $this->log->info("New connection with id of $conn->resourceId from $conn->remoteAddress");
         $this->dispatcher->dispatch(new WsOnOpen($conn));
-        $this->log("New connection with id of $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
+        $this->log->debug("New connection with id of $conn->resourceId from $conn->remoteAddress was handled!");
     }
 
     /**
@@ -71,9 +86,9 @@ final class Server implements MessageComponentInterface
      */
     public function onClose(ConnectionInterface $conn)
     {
-        $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress", );
+        $this->log->info("Connection closed for client $conn->resourceId from $conn->remoteAddress");
         $this->dispatcher->dispatch(new WsOnClose($conn));
-        $this->log("Connection closed for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
+        $this->log->debug("Connection closed for client $conn->resourceId from $conn->remoteAddress was handled!");
     }
 
     /**
@@ -84,9 +99,9 @@ final class Server implements MessageComponentInterface
     public function onError(ConnectionInterface $conn, \Exception $e)
     {
         $msg = $e->getMessage();
-        $this->log("Error for client $conn->resourceId from $conn->remoteAddress with message of $msg", self::LOG_ERROR);
+        $this->log->warning("Error for client $conn->resourceId from $conn->remoteAddress with message of $msg");
         //$this->dispatcher->dispatch(new WsOnError($conn, $e));
-        $this->log("Error for client $conn->resourceId from $conn->remoteAddress was handled!", self::LOG_DEBUG);
+        $this->log->debug("Error for client $conn->resourceId from $conn->remoteAddress was handled!");
     }
 
     /**
@@ -96,21 +111,42 @@ final class Server implements MessageComponentInterface
      */
     public function onMessage(ConnectionInterface $from, $msg)
     {
-        $this->log("Client $from->resourceId from $from->remoteAddress sent a message of $msg", self::LOG_INFO, OutputInterface::VERBOSITY_VERBOSE);
+        $this->log->info("Client $from->resourceId from $from->remoteAddress sent a message of $msg");
         $this->dispatcher->dispatch(new WsOnMessage($from, $msg));
-        $this->log("Client $from->resourceId message from $from->remoteAddress was handled", self::LOG_DEBUG);
-    }
-
-    private function log(string $msg, $type = self::LOG_INFO, $level = OutputInterface::VERBOSITY_NORMAL): void
-    {
-        $type = self::LOG_STRINGS[$type];
-        $date = (new \DateTimeImmutable())->format(DATE_ATOM);
-        $this->output->writeln("$date [$type] $msg", self::LOG_DEBUG === $type ? OutputInterface::VERBOSITY_DEBUG : $level);
+        $this->log->debug("Client $from->resourceId message from $from->remoteAddress was handled");
     }
 
     public function onConsume(\AMQPEnvelope $envelope, \AMQPQueue $queue): void
     {
-        var_dump($envelope->getBody());
-        //var_dump($this->serializer->deserialize($envelope->getBody(), 'class', 'json'));
+        /** @var Envelope $message */
+        $message = $this->serializer->decode(['headers' => $envelope->getHeaders(), 'body' => $envelope->getBody()]);
+        $message = $message->with(new MessageDeliveryTagStamp($envelope->getDeliveryTag()));
+        $event = new WorkerMessageReceivedEvent($message, 'public');
+        $this->dispatcher->dispatch($event);
+
+        if (!$event->shouldHandle()) {
+            return;
+        }
+
+        try {
+            $this->eventBus->dispatch($message->with(new ReceivedStamp('public'), new ConsumedByWorkerStamp()));
+        } catch (\Throwable $e) {
+            $rejectFirst = $e instanceof RejectRedeliveredMessageException;
+            if($rejectFirst) {
+                $queue->reject($envelope->getDeliveryTag());
+            }
+
+            if ($e instanceof HandlerFailedException) {
+                $message = $e->getEnvelope();
+            }
+
+            $this->dispatcher->dispatch(new WorkerMessageFailedEvent($message, 'public', $e));
+
+            if (!$rejectFirst) {
+                $queue->reject($message->last(MessageDeliveryTagStamp::class)->id);
+            }
+
+            return;
+        }
     }
 }
