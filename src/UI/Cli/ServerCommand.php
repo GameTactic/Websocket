@@ -14,6 +14,7 @@ namespace App\UI\Cli;
 
 use App\Infrastructure\Shared\AmqpAwareWsServer;
 use App\Infrastructure\Shared\Server;
+use Psr\Log\LoggerInterface;
 use Ratchet\Http\HttpServer;
 use Ratchet\Server\IoServer;
 use React\EventLoop\Factory as LoopFactory;
@@ -25,11 +26,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class ServerCommand extends Command
 {
     private Server $server;
+    private LoggerInterface $log;
 
-    public function __construct(Server $server, string $name = null)
+    public function __construct(Server $server, LoggerInterface $log, string $name = null)
     {
         parent::__construct($name);
         $this->server = $server;
+        $this->log = $log;
     }
 
     protected function configure()
@@ -58,18 +61,21 @@ final class ServerCommand extends Command
         ]);
         $conn->connect();
         $channel = new \AMQPChannel($conn);
+        $exchange = new \AMQPExchange($channel);
+        $exchange->setType(AMQP_EX_TYPE_FANOUT);
+        $exchange->setFlags(AMQP_DURABLE);
+        $exchange->setName('messages');
+        $exchange->declareExchange();
         $queue = new \AMQPQueue($channel);
         $queue->setName('messages');
         $queue->setFlags(AMQP_DURABLE);
         $queue->declareQueue();
-        //$exchange = new \AMQPExchange($channel);
-        //$exchange->setName('GT_WS');
-        //$exchange->declare();
+        $queue->bind('messages');
 
         $output->writeln('Server starting...');
         $loop = LoopFactory::create();
         $socket = new Reactor("$host:$port", $loop);
-        $server = new AmqpAwareWsServer($this->server, $loop, $queue);
+        $server = new AmqpAwareWsServer($this->server, $loop, $queue, $exchange, $this->log);
         $server->enableKeepAlive($loop, 30);
         $server = new IoServer(new HttpServer($server), $socket, $loop);
         $output->writeln('Server up!');
