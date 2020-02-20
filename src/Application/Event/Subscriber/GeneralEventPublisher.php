@@ -18,16 +18,16 @@ use App\Application\Event\Ws\OnOpen;
 use App\Domain\Ratchet\Event\WsOnClose;
 use App\Domain\Ratchet\Event\WsOnMessage;
 use App\Domain\Ratchet\Event\WsOnOpen;
+use App\Infrastructure\Shared\Bus;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 final class GeneralEventPublisher implements EventSubscriberInterface
 {
-    private MessageBusInterface $eventBus;
+    private Bus $bus;
 
-    public function __construct(MessageBusInterface $eventBus)
+    public function __construct(Bus $bus)
     {
-        $this->eventBus = $eventBus;
+        $this->bus = $bus;
     }
 
     /**
@@ -44,16 +44,16 @@ final class GeneralEventPublisher implements EventSubscriberInterface
 
     public function onClose(WsOnClose $event): void
     {
-        $this->eventBus->dispatch(new OnClose($event->connection->resourceId, $event->connection->resourceId));
+        $this->bus->event(new OnClose($event->connection->resourceId, $event->connection->resourceId));
     }
 
     public function onOpen(WsOnOpen $event): void
     {
-        $this->eventBus->dispatch(new OnOpen($event->connection->resourceId, $event->connection->resourceId));
+        $this->bus->event(new OnOpen($event->connection->resourceId, $event->connection->resourceId));
     }
 
     public function onMessage(WsOnMessage $event): void
     {
-        $this->eventBus->dispatch(new OnMessage($event->from->resourceId, $event->from->resourceId, $event->message));
+        $this->bus->event(new OnMessage($event->from->resourceId, $event->from->resourceId, $event->message));
     }
 }
