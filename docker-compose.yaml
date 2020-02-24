@@ -12,6 +12,18 @@ services:
     - "1337:1337"
     command: ['/app/bin/console', 'app:serve', '0.0.0.0', '1337', '-vvvv']
 
+  handlers:
+    build: ./etc/dev/php
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - amqp
+    expose:
+      - "1337"
+    command: ['/app/bin/console', 'app:serve', '0.0.0.0', '1337', '-vvvv']
+
+
   amqp:
     image: rabbitmq:3-management
     environment:

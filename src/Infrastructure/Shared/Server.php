@@ -34,21 +34,11 @@ use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 
 final class Server implements MessageComponentInterface
 {
-    private const LOG_DEBUG = 0x1;
-    private const LOG_INFO = 0x2;
-    private const LOG_WARN = 0x3;
-    private const LOG_ERROR = 0x4;
-    private const LOG_STRINGS = [
-        self::LOG_DEBUG => 'debug',
-        self::LOG_INFO  => 'info',
-        self::LOG_WARN  => 'warning',
-        self::LOG_ERROR => 'error',
-    ];
-
     private EventDispatcherInterface $dispatcher;
     private LoggerInterface $log;
     private SerializerInterface $serializer;
     private MessageBusInterface $eventBus;
+    private array $processed = [];
 
     public function __construct(
         EventDispatcherInterface $dispatcher,
@@ -145,6 +135,9 @@ final class Server implements MessageComponentInterface
         }
 
         $this->dispatcher->dispatch(new WorkerMessageHandledEvent($message, 'public'));
-        $queue->ack($message->last(MessageDeliveryTagStamp::class)->id);
+        // We are trusting TTL and RabbitMQ to deliver twice.
+        // This is just example, how to ack the message.
+        // $queue->ack($message->last(MessageDeliveryTagStamp::class)->id);
+        $queue->reject($message->last(MessageDeliveryTagStamp::class)->id, AMQP_REQUEUE);
     }
 }

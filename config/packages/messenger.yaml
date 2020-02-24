@@ -1,7 +1,14 @@
 framework:
     messenger:
         transports:
-            public: '%env(MESSENGER_TRANSPORT_DSN)%'
+            public:
+              dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+              options:
+                queue:
+                  arguments:
+                    x-message-ttl: 2000 # 2 Seconds
+                    x-expires: 2000 # 2 Seconds
+
             private: 'sync://'
         default_bus: messenger.bus.command
         buses:
